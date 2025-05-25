@@ -236,7 +236,7 @@ install_opencv_gpu() {
 
     conda install -c conda-forge libstdcxx-ng
 
-    log_step "Compiling OpenCV (this may take a very long time...)"
+    log_step "Compiling OpenCV (this will take a very long time...)"
     make -j $(nproc)
 
     log_step "Installing OpenCV"
@@ -245,14 +245,10 @@ install_opencv_gpu() {
     log_step "Updating library cache"
     sudo ldconfig
 
-    log_step "OpenCV Installation Complete"
-    echo "OpenCV Python bindings should be available at $PYTHON3_PACKAGES_PATH"
-    echo "Verifying installation by trying to import cv2 in Python..."
-    if $PYTHON_EXECUTABLE -c "import cv2; print(f'OpenCV version: {cv2.__version__}')"; then
-        echo "OpenCV successfully imported."
-    else
-        echo "Failed to import cv2. You might need to add $PYTHON3_PACKAGES_PATH to your PYTHONPATH."
-    fi
+    log_step "OpenCV Testing"
+    conda activate Track
+    cd $HOME/Linux-Install/Jetson
+    python test_opencv.py
 }
 
 # === Main Script Execution ===
