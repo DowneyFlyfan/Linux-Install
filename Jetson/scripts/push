@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+  echo "错误：请输入提交信息！"
+  echo "用法: $0 \"您的提交信息\""
+  exit 1
+fi
+
+git add *
+git commit -m "$1"
+echo "Committing with message: $1"
+git push -u origin main
+
+if [ $? -eq 0 ]; then
+  echo "推送成功！"
+else
+  echo "推送失败。"
+  exit 1
+fi
