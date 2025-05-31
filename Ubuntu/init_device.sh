@@ -148,22 +148,22 @@ clone_configurations() {
 
 # === Main Script Execution ===
 main() {
-    # System and environment setup
+    # system and environment setup
     setup_basic_system
     setup_nodejs_env
     setup_input_method
 
-    # Python
+    # python
     setup_python
     install_conda
 
-    # Others
+    # others
     clone_configurations
     install_other_packages
     configure_shell
     setup_user_scripts
 
-    log_step "Setup Complete! Now use put the st command into 'Startup Application'!"
+    log_step "setup complete! now use put the st command into 'startup application'!"
 }
 
 main

@@ -1,6 +1,5 @@
 #!/bin/bash
-
-OPENCV_VERSION="${OPENCV_VERSION:-4.9.0}"
+set -e
 
 # Basics
 log_step() {
@@ -15,12 +14,18 @@ setup_basic_system() {
     sudo apt update
     sudo apt upgrade
     sudo apt install -y firefox ranger fzf curl exfatprogs exfat-fuse openssh-server htop xclip
-}
 
-setup_python_env() {
-    log_step "Setting up Python Environment"
-    sudo apt install -y python3-pip python3.10-venv
-    sudo pip3 install --upgrade pip
+    log_step "Installing neovim"
+    sudo add-apt-repository -y ppa:deadsnakes/ppa
+    sudo add-apt-repository -y ppa:neovim-ppa/stable # Using stable PPA for Neovim
+    sudo apt update
+    echo "Installing Neovim..."
+    sudo snap install nvim --classic
+
+    log_step "Configuring Input Method (fcitx5)"
+    sudo apt install -y fcitx5 fcitx5-frontend-gtk3 fcitx5-frontend-qt5 fcitx5-config-qt fcitx5-chinese-addons
+    im-config -n fcitx5
+    log_step "记得重启, 并在fcitx5设置中调整快捷键, 在设置中切换Mac键盘"
 }
 
 setup_nodejs_env() {
@@ -53,34 +58,31 @@ setup_nodejs_env() {
     fi
 }
 
-add_ppas_and_install_extras() {
-    log_step "Adding PPAs and Installing Additional Packages"
-    sudo add-apt-repository -y ppa:deadsnakes/ppa
-    sudo add-apt-repository -y ppa:neovim-ppa/stable # Using stable PPA for Neovim
-    sudo apt update
-    echo "Installing Neovim..."
-    sudo snap install nvim --classic
-}
-
-# Input Methods & User Scripts & shell & Python Packages & User Repo
-setup_input_method() {
-    log_step "Configuring Input Method (fcitx5)"
-    sudo apt install -y fcitx5 fcitx5-frontend-gtk3 fcitx5-frontend-qt5 fcitx5-config-qt fcitx5-chinese-addons
-    echo "Setting fcitx5 as default input method. This may require a reboot or session restart."
-    im-config -n fcitx5
-    echo "记得在 设置 fcitx5设置 中 调整快捷键, 在设置中切换Mac键盘"
-}
-
+# User Scripts & shell & Python
 setup_user_scripts() {
     log_step "Setting up User Scripts"
+    cd $HOME/Linux-Install/Jetson
 
     mv scripts $HOME/Documents
     mv ../Clash $HOME/Documents
+
+    rm -rf $HOME/.config/ranger
     mv ../ranger $HOME/.config
 
     cd $HOME/Documents
     nohup ./CrashCore -d . > output.log 2>&1 &
     cd $HOME
+
+    log_step "Cloning neovim configurations"
+    mkdir -p "$HOME/.config"
+
+    local nvim_config_repo_url="https://github.com/DowneyFlyfan/neovim-configuration.git"
+    local nvim_config_temp_dir="$HOME/neovim_config_temp"
+    echo "Cloning Neovim configuration repository from $nvim_config_repo_url..."
+    if git clone "$nvim_config_repo_url" "$nvim_config_temp_dir"; then
+        echo "Moving Neovim configuration to $HOME/.config/nvim..."
+        mv "$nvim_config_temp_dir" "$HOME/.config/nvim"
+    fi
 }
 
 configure_shell() {
@@ -108,44 +110,64 @@ configure_shell() {
     fi
 }
 
-install_conda_packages() {
+setup_python() {
+    log_step "Setting up Python Environment"
+    sudo apt install -y python3-pip python3.10-venv
+    sudo pip3 install --upgrade pip
+
     log_step "Installing Jetson Specific Python Packages"
     sudo apt-get update && sudo apt-get upgrade -y
     sudo apt-get install -y python3-pip libjpeg-dev libpng-dev libtiff-dev
 
-    echo "Installing miniconda3..."
+    log_step "Installing Latest miniconda3 ARM64 Version..."
     curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
-    chmod 777 Miniconda3-latest-Linux-aarch64.sh
-    rm -rf Miniconda3-latest-Linux-aarch64.sh
-    echo "PATH=$HOME/miniconda3/bin:$PATH" >> ~/.bashrc
-    source .bashrc
+    local miniconda_installer="Miniconda3-latest-Linux-aarch64.sh"
+    local miniconda_install_path="$HOME/miniconda3"
+    local miniconda_init_script="$miniconda_install_path/etc/profile.d/conda.sh"
 
-    echo "Into Conda Environment..."
-    conda create --name Track python=3.10
-    conda init
-    source .bashrc
+    chmod +x "$miniconda_installer"
+    # Install in batch mode (-b) to the specified prefix (-p)
+    "./$miniconda_installer" -b -p "$miniconda_install_path"
+    rm -f "$miniconda_installer"
+
+    # Initialize conda in the current shell session
+    if [ -f "$miniconda_init_script" ]; then
+        # shellcheck source=/dev/null
+        . "$miniconda_init_script"
+        echo "Conda initialized in current session."
+    else
+        echo "❌ Conda initialization script not found at $miniconda_init_script"
+        echo "Please manually initialize conda after the script finishes."
+        # Exit here if conda init is critical for subsequent steps
+        # exit 1
+    fi
+
+    log_step "Into Conda Environment..."
+    conda config --set auto_activate_base false
+    conda create --yes --name Track python=3.10
+    source $HOME/.bashrc
     conda activate Track
 
-    echo "Installing torch, torchvision and torchaudio (CUDA 12.2)"
-    curl -O https://nvidia.box.com/shared/static/mp164asf3sceb570wvjsrezk1p4ftj8t.whl
-    curl -O https://nvidia.box.com/shared/static/9agsjfee0my4sxckdpuk9x9gt8agvjje.whl
-    curl -O https://nvidia.box.com/shared/static/xpr06qe6ql3l6rj22cu3c45tz1wzi36p.whl
-    
-    pip install torch-2.3.0-cp310-cp310-linux_aarch64.whl torchaudio-2.3.0+952ea74-cp310-cp310-linux_aarch64.whl torchvision-0.18.0a0+6043bc2-cp310-cp310-linux_aarch64.whl
-    echo "Installing other packages"
-}
+    log_step "Installing torch, torchvision"
+    cd $HOME/Downloads
+    wget https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/6cc/6ecfe8a5994fd/torch-2.6.0-cp310-cp310-linux_aarch64.whl#sha256=6cc6ecfe8a5994fd6d58fb6d6eb73ff2437428bb4953f3ebaa409f83a5f4db99
+    pip install torch-2.6.0-cp310-cp310-linux_aarch64.whl
+    wget https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/aa2/2da8dcf4c4c8d/torchvision-0.21.0-cp310-cp310-linux_aarch64.whl#sha256=aa22da8dcf4c4c8dc897e7922b1ef25cb0fe350e1a358168be87a854ad114531
+    pip install torchvision-0.21.0-cp310-cp310-linux_aarch64.whl
 
-clone_configurations() {
-    log_step "Cloning Configurations"
-    mkdir -p "$HOME/.config"
+    log_step "Installing Other Packages"
+    pip install numpy=2.1.3 scipy cupy-cuda12x setuptools pytest
 
-    local nvim_config_repo_url="https://github.com/DowneyFlyfan/neovim-configuration.git"
-    local nvim_config_temp_dir="$HOME/neovim_config_temp"
-    echo "Cloning Neovim configuration repository from $nvim_config_repo_url..."
-    if git clone "$nvim_config_repo_url" "$nvim_config_temp_dir"; then
-        echo "Moving Neovim configuration to $HOME/.config/nvim..."
-        mv "$nvim_config_temp_dir" "$HOME/.config/nvim"
-    fi
+    rm -rf $HOME/.local/lib
+
+    log_step "Installing and initiate pycharm"
+    cd $HOME/Downloads
+    wget https://download.jetbrains.com/python/pycharm-professional-2023.3.7.tar.gz
+    tar -xvzf pycharm-professional-2023.3.7-aarch64.tar.gz
+    rm -rf pycharm-professional-2023.3.7-aarch64.tar.gz
+    mv pycharm-2023.3.7 $HOME/Documents/Pycharm
+    cd $HOME/Documents/Pycharm/bin
+    ./pycharm.sh
 }
 
 # opencv_GPU
@@ -153,6 +175,8 @@ install_opencv_gpu() {
     conda activate Track
     echo "Please refer to https://gist.github.com/minhhieutruong0705/8f0ec70c400420e0007c15c98510f133"
     log_step "Building and Installing OpenCV CUDA Version, it will take approximately 3 hours!!!!"
+
+    OPENCV_VERSION="${OPENCV_VERSION:-4.9.0}"
 
     local CUDA_ARCH_BIN_VALUE="8.7"
     echo "Using CUDA_ARCH_BIN: $CUDA_ARCH_BIN_VALUE (Please verify this for your GPU!)"
@@ -204,70 +228,66 @@ install_opencv_gpu() {
     cd opencv && git checkout "$OPENCV_VERSION" && cd ..
     cd opencv_contrib && git checkout "$OPENCV_VERSION" && cd ..
 
+    conda install -c conda-forge libstdcxx-ng
+
     log_step "Configuring OpenCV build with CMake"
     mkdir -p "$HOME/opencv_build"
     cd "$HOME/opencv_build" || return 1
 
     cmake \
-    -D CMAKE_BUILD_TYPE=Release \
-    -D CMAKE_INSTALL_PREFIX=$HOME/miniconda3/envs/Track \
-    -D OPENCV_EXTRA_MODULES_PATH=~/opencv_contrib/modules/ \
-    -D PYTHON3_EXECUTABLE=$HOME/miniconda3/envs/Track/bin/python \
-    -D PYTHON3_INCLUDE_DIR=$HOME/miniconda3/envs/Track/include/python3.10/ \
-    -D PYTHON3_LIBRARY=$HOME/miniconda3/envs/Track/lib/libpython3.10.so \
-    -D PYTHON3_NUMPY_INCLUDE_DIRS=$HOME/miniconda3/envs/Track/lib/python3.10/site-packages/numpy/_core/include/ \
-    -D OPENCV_GENERATE_PKGCONFIG=ON \
-    -D OPENCV_PC_FILE_NAME=opencv.pc \
-    -D OPENCV_ENABLE_NONFREE=ON \
-    -D WITH_CUDA=ON \
-    -D WITH_CUDNN=ON \
-    -D OPENCV_DNN_CUDA=ON \
-    -D CUDA_ARCH_BIN=8.7 \
-    -D ENABLE_FAST_MATH=ON \
-    -D CUDA_FAST_MATH=ON \
-    -D WITH_CUFFT=ON \
-    -D WITH_CUBLAS=ON \
-    -D WITH_V4L=ON \
-    -D WITH_OPENCL=ON \
-    -D WITH_OPENGL=ON \
-    -D WITH_GSTREAMER=ON \
-    -D WITH_TBB=ON \
-    ../opencv
-
-    conda install -c conda-forge libstdcxx-ng
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX=$HOME/miniconda3/envs/Track \
+        -D OPENCV_EXTRA_MODULES_PATH=$HOME/opencv_contrib/modules/ \
+        -D PYTHON3_EXECUTABLE=$HOME/miniconda3/envs/Track/bin/python \
+        -D PYTHON3_INCLUDE_DIR=$HOME/miniconda3/envs/Track/include/python3.10/ \
+        -D PYTHON3_LIBRARY=$HOME/miniconda3/envs/Track/lib/libpython3.10.so \
+        -D PYTHON3_NUMPY_INCLUDE_DIRS=$HOME/miniconda3/envs/Track/lib/python3.10/site-packages/numpy/_core/include/ \
+        -D OPENCV_GENERATE_PKGCONFIG=ON \
+        -D OPENCV_PC_FILE_NAME=opencv.pc \
+        -D OPENCV_ENABLE_NONFREE=ON \
+        -D WITH_CUDA=ON \
+        -D WITH_CUDNN=ON \
+        -D OPENCV_DNN_CUDA=ON \
+        -D CUDA_ARCH_BIN=8.7 \
+        -D ENABLE_FAST_MATH=ON \
+        -D CUDA_FAST_MATH=ON \
+        -D WITH_CUFFT=ON \
+        -D WITH_CUBLAS=ON \
+        -D WITH_V4L=ON \
+        -D WITH_OPENCL=ON \
+        -D WITH_OPENGL=ON \
+        -D WITH_GSTREAMER=ON \
+        -D WITH_TBB=ON \
+        ../opencv
 
     log_step "Compiling OpenCV (this will take a very long time...)"
     make -j $(nproc)
 
     log_step "Installing OpenCV"
-    sudo make install
-
-    log_step "Updating library cache"
-    sudo ldconfig
+    make install
 
     log_step "OpenCV Testing"
+    source "$HOME/.bashrc"
     conda activate Track
-    cd $HOME/Linux-Install/Jetson
-    python test_opencv.py
+    cd "$HOME/Linux-Install/Jetson" || return 1
+    pytest test_opencv.py
 }
 
 # === Main Script Execution ===
 main() {
-    local install_python_packages_choice="N"
-    local install_opencv_choice="N"
-
-    local is_jetson_system=false
-
-    if hostname | grep -iq "jetson"; then
-        is_jetson_system=true
-    fi
-
-    if ! $is_jetson_system; then
-        read -p "Do you want to install Base Python packages? (y/N): " install_python_packages_choice
-    fi
-
-    read -p "Do you want to build and install OpenCV ${OPENCV_VERSION} from source with CUDA support? (This can take a very long time) (y/N): " install_opencv_choice
-    
     cat /etc/nv_tegra_release
+
+    # basics
+    setup_basic_system
+    # setup_nodejs_env
+    setup_python
+
+    # others
+    configure_shell
+    setup_user_scripts
+    # install_opencv_gpu
+
+    log_step "Setup complete! now use put the st command into 'startup application'!"
 }
+
 main
