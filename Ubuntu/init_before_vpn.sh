@@ -25,7 +25,7 @@ setup_basic_system() {
     log_step "Configuring Input Method (fcitx5)"
     sudo apt install -y fcitx5 fcitx5-frontend-gtk3 fcitx5-frontend-qt5 fcitx5-config-qt fcitx5-chinese-addons
     im-config -n fcitx5
-    log_step "记得重启, 并在fcitx5设置中调整快捷键, 在设置中切换Mac键盘"
+
 }
 
 configure_shell() {
@@ -183,6 +183,7 @@ main() {
     log_step "Main Setup Complete!"
     echo "Now use put the st command into 'startup application'"
     echo "Now set up the proxy in 'Setting' as instructed in Readme.md"
+    echo "记得重启, 并在fcitx5设置中调整快捷键, 在设置中切换Mac键盘以及切换的快捷键"
 }
 
 main

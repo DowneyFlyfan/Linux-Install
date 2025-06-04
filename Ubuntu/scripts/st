@@ -1,0 +1,6 @@
+#!/bin/bash
+
+setxkbmap -option caps:escape
+xset r rate 100 60
+cd $HOME/Documents/Clash
+nohup ./CrashCore -d . > output.log 2>&1 &
