@@ -5,6 +5,9 @@ import os
 import re
 import subprocess
 import curses
+import warnings
+
+warnings.filterwarnings("ignore")
 
 from ranger.api.commands import Command
 
@@ -2031,6 +2034,7 @@ class fzf_select(Command):
             # match files and directories
             command = "find -L . \( -path '*/\.*' -o -fstype 'dev' -o -fstype 'proc' \) -prune \
             -o -print 2> /dev/null | sed 1d | cut -b3- | fzf +m"
+
         fzf = self.fm.execute_command(command, stdout=subprocess.PIPE)
         stdout, stderr = fzf.communicate()
         if fzf.returncode == 0:
@@ -2303,11 +2307,12 @@ class sshfs_umount(Command):
 def compose_hostname_list():
     # list of possible hostnames
     # stolen from fzf, https://github.com/junegunn/fzf/blob/master/shell/completion.bash
+
     stdout, _ = execute(
         ["bash"],
         input="""
-command cat <(
     command tail -n +1 ~/.ssh/config ~/.ssh/config.d/* /etc/ssh/ssh_config 2> /dev/null | command grep -i '^\s*host\(name\)\? ' | awk '{for (i = 2; i <= NF; i++) print $1 " " $i}' | command grep -v '[*?]') \
+          -o -print0 | xargs -0 stat --format '%A %h %U %G %s %y %n'"
         <(command grep -oE '^[[a-z0-9.,:-]+' ~/.ssh/known_hosts | tr ',' '\n' | tr -d '[' | awk '{ print $1 " " $1 }') \
         <(command grep -v '^\s*\(#\|$\)' /etc/hosts | command grep -Fv '0.0.0.0') |
         awk '{if (length($2) > 0) {print $2}}' | sort -u

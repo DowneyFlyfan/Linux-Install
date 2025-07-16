@@ -1,9 +1,0 @@
-{
-  "dependencies": {
-    "gray-matter": "^4.0.3",
-    "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.4.0",
-    "rehype-highlight": "^7.0.2",
-    "remark-gfm": "^4.0.1"
-  }
-}

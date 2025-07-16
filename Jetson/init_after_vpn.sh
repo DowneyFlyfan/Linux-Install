@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# End Execution once a single step fails
-set -e
-
 log_step() {
     echo ""
     echo "=================================================="
@@ -80,12 +77,12 @@ setup_conda() {
         echo "Please manually initialize conda after the script finishes."
     fi
 
-    log_step "Initiate Conda Environment..."
-    conda create --name hspeedtrack python=3.10
+    log_step "Creating New Conda Environment..."
+    conda create --name track python=3.10
     source $HOME/.bashrc
     conda init
     source $HOME/.bashrc
-    conda activate hspeedtrack
+    conda activate track
 }
 
 setup_python(){
@@ -99,20 +96,22 @@ setup_python(){
 
     pip install numpy=1.26.4 scipy cupy-cuda12x setuptools pytest pyyaml
     pip install torch-2.7.0-cp310-cp310-linux_aarch64.whl torchvision-0.22.0-cp310-cp310-linux_aarch64.whl torchaudio-2.7.0-cp310-cp310-linux_aarch64.whl
+    sudo pip install jetson-stats
 }
 
 setup_others(){
     log_step "Installing Rust..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-    log_step "Installing C..."
+    log_step "Installing C"
+    sudo rm /etc/apt/sources.list.d/llvm.list
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm-snapshot.gpg
 
-    echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy main" | sudo tee /etc/apt/sources.list.d/llvm.list
-    echo "deb-src [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy main" | sudo tee -a /etc/apt/sources.list.d/llvm.list
+    echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+    echo "deb-src [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | sudo tee -a /etc/apt/sources.list.d/llvm.list
 
     sudo apt update
-    sudo apt install llvm-20
+    sudo apt install llvm-17
 }
 
 install_opencv_cuda() {
@@ -232,4 +231,4 @@ main(){
     install_opencv_cuda
 }
 
-install_opencv_cuda
+main

@@ -54,14 +54,10 @@ setup_nodejs_env() {
 
 setup_conda() {
     log_step "Setting up Python Environment"
-    sudo apt install -y python3-pip python3.10-venv
-    sudo pip3 install --upgrade pip
+    sudo apt update && sudo apt upgrade -y
+    sudo apt install -y libjpeg-dev libpng-dev libtiff-dev python3-pip
 
-    log_step "Installing Jetson Specific Python Packages"
-    sudo apt-get update && sudo apt-get upgrade -y
-    sudo apt-get install -y python3-pip libjpeg-dev libpng-dev libtiff-dev
-
-    log_step "Installing Latest miniconda3 ARM64 Version..."
+    log_step "Installing Latest miniconda3 Version..."
     curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
     local miniconda_installer="Miniconda3-latest-Linux-aarch64.sh"
     local miniconda_install_path="$HOME/miniconda3"
@@ -79,40 +75,27 @@ setup_conda() {
         echo "❌ Conda initialization script not found at $miniconda_init_script"
         echo "Please manually initialize conda after the script finishes."
     fi
-
-    log_step "Initiate Conda Environment..."
-    conda create --name hspeedtrack python=3.10
-    source $HOME/.bashrc
-    conda init
-    source $HOME/.bashrc
-    conda activate hspeedtrack
 }
 
 setup_python(){
-    log_step "Please visit https://pypi.jetson-ai-lab.dev/jp6 to see latest version"
-    log_step "Installing torch and other python packages in conda env"
-    cd $HOME/Downloads
-    wget https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/6ef/f643c0a7acda9/torch-2.7.0-cp310-cp310-linux_aarch64.whl#sha256=6eff643c0a7acda92734cc798338f733ff35c7df1a4434576f5ff7c66fc97319
-    wget https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/c59/026d500c57366/torchaudio-2.7.0-cp310-cp310-linux_aarch64.whl#sha256=c59026d500c573666ae0437c4202ac312ac8ebe38fa12dbb37250a07c1e826f9
-    wget https://pypi.jetson-ai-lab.dev/jp6/cu126/+f/daa/bff3a07259968/torchvision-0.22.0-cp310-cp310-linux_aarch64.whl#sha256=daabff3a0725996886b92e4b5dd143f5750ef4b181b5c7d01371a9185e8f0402
-    rm -rf $HOME/.local/lib
-
-    pip install numpy=1.26.4 scipy cupy-cuda12x setuptools pytest pyyaml
-    pip install torch-2.7.0-cp310-cp310-linux_aarch64.whl torchvision-0.22.0-cp310-cp310-linux_aarch64.whl torchaudio-2.7.0-cp310-cp310-linux_aarch64.whl
+    conda activate
+    pip install numpy scipy cupy-cuda12x setuptools pytest pyyaml
+    pip install torch torchvision torchaudio onnxruntime
 }
 
 setup_others(){
     log_step "Installing Rust..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-    log_step "Installing C..."
+    log_step "Installing C"
+    sudo rm /etc/apt/sources.list.d/llvm.list
     wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/llvm-snapshot.gpg
 
-    echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy main" | sudo tee /etc/apt/sources.list.d/llvm.list
-    echo "deb-src [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy main" | sudo tee -a /etc/apt/sources.list.d/llvm.list
+    echo "deb [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+    echo "deb-src [signed-by=/etc/apt/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" | sudo tee -a /etc/apt/sources.list.d/llvm.list
 
     sudo apt update
-    sudo apt install llvm-20
+    sudo apt install llvm-17
 }
 
 # === Main Script Execution ===
@@ -124,3 +107,5 @@ main(){
     setup_python
     setup_others
 }
+
+main
